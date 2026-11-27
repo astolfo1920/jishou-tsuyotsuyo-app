@@ -18,7 +18,9 @@
   const QUIZ_LABEL = { math: '計算', memory: '数字記憶', mix: 'ミックス' };
   const DIFF_LABEL = { easy: 'かんたん', normal: 'ふつう', hard: 'むずかしい' };
   const HOUR_PX = 32;
-  const SNOOZE_DEMO_SEC = 15; // モックなので実際の5分ではなく短縮
+  const DEFAULT_SNOOZE_MIN = 5;
+  const TEST_SNOOZE_SEC = 15; // テスト鳴動時は待ち時間を短縮
+  const snoozeMinOf = a => a.snoozeMin ?? DEFAULT_SNOOZE_MIN; // 旧データには snoozeMin が無い
 
   // ============ ユーティリティ ============
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -431,7 +433,7 @@
           <div class="alarm-tags">
             <span class="tag">🧩 ${QUIZ_LABEL[a.quizType]}</span>
             <span class="tag">${DIFF_LABEL[a.difficulty]}×${a.count}問</span>
-            <span class="tag">💤 スヌーズ${a.snooze ? a.snooze + '回' : 'なし'}</span>
+            <span class="tag">💤 ${a.snooze ? `${snoozeMinOf(a)}分×${a.snooze}回` : 'スヌーズなし'}</span>
           </div>
         </div>
         <div class="alarm-side">
@@ -478,7 +480,7 @@
 
   function openAlarmForm(alarm) {
     editingAlarm = alarm;
-    const a = alarm || { time: '07:00', days: [0, 1, 2, 3, 4], label: '', quizType: 'math', difficulty: 'normal', count: 3, snooze: 1 };
+    const a = alarm || { time: '07:00', days: [0, 1, 2, 3, 4], label: '', quizType: 'math', difficulty: 'normal', count: 3, snooze: 1, snoozeMin: DEFAULT_SNOOZE_MIN };
     $('#alarm-sheet-title').textContent = alarm ? 'アラームを編集' : 'アラームを追加';
     alarmForm.time.value = a.time;
     alarmForm.label.value = a.label;
@@ -486,6 +488,7 @@
     $$('#day-picker button').forEach(b => b.classList.toggle('active', pickedDays.includes(Number(b.dataset.d))));
     setSeg('quizType', a.quizType);
     setSeg('difficulty', a.difficulty);
+    setSeg('snoozeMin', String(snoozeMinOf(a)));
     alarmForm.count.value = a.count; $('#count-val').textContent = a.count;
     alarmForm.snooze.value = a.snooze; $('#snooze-val').textContent = a.snooze;
     $('#btn-delete-alarm').hidden = !alarm;
@@ -497,7 +500,7 @@
     const data = {
       time: alarmForm.time.value, label: alarmForm.label.value.trim(), days: [...pickedDays].sort(),
       quizType: segValue('quizType'), difficulty: segValue('difficulty'),
-      count: Number(alarmForm.count.value), snooze: Number(alarmForm.snooze.value), enabled: true,
+      count: Number(alarmForm.count.value), snooze: Number(alarmForm.snooze.value), snoozeMin: Number(segValue('snoozeMin')), enabled: true,
     };
     if (editingAlarm) Object.assign(editingAlarm, data);
     else state.alarms.push({ id: uid(), ...data });
@@ -563,7 +566,7 @@
   function startRing(alarm, isTest = false) {
     if (ring) return;
     ring = {
-      alarm, isTest, idx: 0, input: '', mistakes: 0, snoozes: 0,
+      alarm, isTest, idx: 0, input: '', mistakes: 0, snoozes: 0, snoozedSec: 0,
       startTs: Date.now(), memorizing: false,
       questions: Array.from({ length: alarm.count }, () => makeQuestion(alarm.quizType, alarm.difficulty)),
     };
@@ -584,7 +587,8 @@
     const left = ring.alarm.snooze - ring.snoozes;
     const b = $('#btn-snooze');
     b.disabled = left <= 0;
-    b.textContent = left > 0 ? `スヌーズ（残り${left}回）` : 'スヌーズ上限に達しました';
+    const len = ring.isTest ? `${TEST_SNOOZE_SEC}秒` : `${snoozeMinOf(ring.alarm)}分`;
+    b.textContent = left > 0 ? `スヌーズ（${len}・残り${left}回）` : 'スヌーズ上限に達しました';
     b.style.opacity = left > 0 ? 1 : 0.5;
   }
 
@@ -655,15 +659,17 @@
     ring.snoozes++;
     stopSound(); clearTimeout(ring.memTimer);
     $('#ring-overlay').hidden = true;
-    toast(`💤 スヌーズ中（デモのため${SNOOZE_DEMO_SEC}秒後に再鳴動）`, 3000);
+    const sec = ring.isTest ? TEST_SNOOZE_SEC : snoozeMinOf(ring.alarm) * 60;
+    ring.snoozedSec += sec;
+    toast(`💤 スヌーズ中（${ring.isTest ? `テストのため${sec}秒` : `${sec / 60}分`}後に再鳴動）`, 3000);
     const r = ring;
-    setTimeout(() => { if (ring === r) showRing(); }, SNOOZE_DEMO_SEC * 1000);
+    setTimeout(() => { if (ring === r) showRing(); }, sec * 1000);
   });
 
   function finishRing() {
     stopSound(); clearTimeout(ring.memTimer);
     $('#ring-overlay').hidden = true;
-    const sec = Math.round((Date.now() - ring.startTs) / 1000 - ring.snoozes * SNOOZE_DEMO_SEC);
+    const sec = Math.max(0, Math.round((Date.now() - ring.startTs) / 1000 - ring.snoozedSec));
     const wakeScore = Math.round(clamp(100 - ring.mistakes * 8 - ring.snoozes * 15 - Math.max(0, sec - ring.questions.length * 10) * 0.6, 20, 100));
     const r = ring; ring = null;
     if (!r.alarm.days.length && !r.isTest) { r.alarm.enabled = false; save(); }

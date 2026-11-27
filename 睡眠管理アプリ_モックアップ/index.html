@@ -164,6 +164,14 @@
         </div>
         <label class="field row">問題数<span><input type="range" name="count" min="1" max="5" value="3"> <b id="count-val">3</b>問</span></label>
         <label class="field row">スヌーズ回数上限<span><input type="range" name="snooze" min="0" max="3" value="1"> <b id="snooze-val">1</b>回</span></label>
+        <div class="field">スヌーズ時間
+          <div class="seg wide" data-name="snoozeMin">
+            <button type="button" data-v="1">1分</button>
+            <button type="button" data-v="5" class="active">5分</button>
+            <button type="button" data-v="10">10分</button>
+            <button type="button" data-v="15">15分</button>
+          </div>
+        </div>
         <button type="button" class="btn-danger" id="btn-delete-alarm" hidden>このアラームを削除</button>
       </form>
     </div>
@@ -248,7 +256,7 @@
         <div class="quiz-answer" id="quiz-answer">&nbsp;</div>
         <div class="numpad" id="numpad"></div>
       </div>
-      <button class="btn-ghost" id="btn-snooze">スヌーズ（5分）</button>
+      <button class="btn-ghost" id="btn-snooze">スヌーズ</button>
     </div>
 
     <!-- ===== おはよう結果 ===== -->
