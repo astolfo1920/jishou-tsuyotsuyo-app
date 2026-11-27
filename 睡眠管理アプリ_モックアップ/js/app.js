@@ -267,15 +267,22 @@
   }
 
   function renderRhythmWarn() {
-    const issues = rhythmAlert();
+    // ×で閉じた日は表示しない（翌日になれば再判定）
+    const issues = state.rhythmDismissed === dateKey(new Date()) ? null : rhythmAlert();
     let html = '';
     if (issues) {
       const nw = wakeMinForDay((monDay(new Date()) + 1) % 7);
       const tip = nw != null ? `今夜は <b>${minToHM(nw - sleepNeedMin())}</b> までに寝て、リズムを戻しましょう。` : '今夜は早めに寝て、リズムを戻しましょう。';
-      html = `⚠️ 睡眠リズムが平均を下回っています<br>・${issues.join('<br>・')}<br>${tip}`;
+      html = `<button type="button" class="warn-close" aria-label="警告を閉じる" data-dismiss-rhythm>×</button>`
+        + `⚠️ 睡眠リズムが平均を下回っています<br>・${issues.join('<br>・')}<br>${tip}`;
     }
     $$('.rhythm-warn').forEach(el => { el.hidden = !issues; el.innerHTML = html; });
   }
+  document.addEventListener('click', e => {
+    if (!e.target.closest('[data-dismiss-rhythm]')) return;
+    state.rhythmDismissed = dateKey(new Date()); save();
+    renderRhythmWarn();
+  });
 
   // ============ ホーム画面 ============
   let homeRange = 7;

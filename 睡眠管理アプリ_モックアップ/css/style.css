@@ -217,6 +217,13 @@ input, select { font-family: inherit; }
   background: rgba(255,138,122,.15); border: 1px solid var(--warn); color: #ffd2cb;
   border-radius: 12px; padding: 10px 12px; font-size: 12px; margin-bottom: 10px; line-height: 1.5;
 }
+.rhythm-warn { position: relative; padding-right: 36px; }
+.warn-close {
+  position: absolute; top: 4px; right: 4px;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: transparent; color: #ffd2cb; font-size: 18px; line-height: 1;
+}
+.warn-close:hover { background: rgba(255,255,255,.1); }
 .timetable-wrap {
   background: var(--card); border-radius: var(--radius);
   height: 420px; overflow: auto; margin-bottom: 10px; position: relative;
