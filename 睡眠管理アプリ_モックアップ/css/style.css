@@ -218,6 +218,12 @@ input, select { font-family: inherit; }
   border-radius: 12px; padding: 10px 12px; font-size: 12px; margin-bottom: 10px; line-height: 1.5;
 }
 .rhythm-warn { position: relative; padding-right: 36px; }
+.setup-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; }
+.setup-row .btn-text { flex-shrink: 0; }
+
+/* Android アプリ版：本物のステータスバーと重なる疑似ステータスバーは中身を隠して余白だけ残す */
+.native .statusbar { visibility: hidden; }
+.native .demo-note { display: none; }
 .warn-close {
   position: absolute; top: 4px; right: 4px;
   width: 28px; height: 28px; border-radius: 50%;

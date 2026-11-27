@@ -22,6 +22,17 @@
   const TEST_SNOOZE_SEC = 15; // テスト鳴動時は待ち時間を短縮
   const snoozeMinOf = a => a.snoozeMin ?? DEFAULT_SNOOZE_MIN; // 旧データには snoozeMin が無い
 
+  // ============ Android アプリ連携 ============
+  // Android アプリとして動いているときは、アラームの予約・鳴動をネイティブ側（NemuAlarm）に任せる。
+  // 画面OFFやアプリ終了中でも鳴り、クイズに正解して stop を呼ぶまで音が止まらない。
+  const Cap = window.Capacitor;
+  const isNative = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
+  const native = (method, opts = {}) => isNative
+    ? Cap.nativePromise('NemuAlarm', method, opts).catch(err => { console.warn('NemuAlarm.' + method, err); return {}; })
+    : Promise.resolve({});
+  if (isNative) document.documentElement.classList.add('native');
+  let lastNativeSig = ''; // 最後にネイティブへ送った予約内容（初回の save() より前に宣言が必要）
+
   // ============ ユーティリティ ============
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -102,7 +113,10 @@
   let state;
   try { state = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch { state = null; }
   if (!state || !state.alarms) state = createDemoState();
-  const save = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* 保存不可でも動作は継続 */ } };
+  const save = () => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* 保存不可でも動作は継続 */ }
+    syncNativeAlarms();
+  };
   save();
 
   // ============ 画面遷移 ============
@@ -110,7 +124,7 @@
     $$('.screen').forEach(s => s.classList.toggle('active', s.id === `screen-${name}`));
     $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.goto === name));
     if (name === 'home') renderHome();
-    if (name === 'alarm') renderAlarms();
+    if (name === 'alarm') { renderAlarms(); renderNativeSetup(); }
     if (name === 'schedule') { renderSchedule(); scrollTimetable(); }
   }
   document.addEventListener('click', e => {
@@ -169,6 +183,38 @@
     return Math.min(...list.map(a => hmToMin(a.time)));
   }
   const sleepNeedMin = () => state.settings.goal * 60 + state.settings.latency;
+
+  // 有効なアラームの「次に鳴る時刻」をネイティブ側に予約する（内容が変わったときだけ送る）
+  function syncNativeAlarms() {
+    if (!isNative) return;
+    const list = state.alarms.filter(a => a.enabled).map(a => {
+      const t = nextOccurrence(a);
+      return t && { id: a.id, at: t.getTime(), label: a.label || 'アラーム' };
+    }).filter(Boolean);
+    const sig = JSON.stringify(list);
+    if (sig === lastNativeSig) return;
+    lastNativeSig = sig;
+    native('setAlarms', { alarms: list });
+  }
+
+  // ネイティブ側で鳴動が始まっていたらクイズ画面を出す
+  let checkingRing = false;
+  function checkNativeRinging() {
+    if (!isNative || checkingRing) return;
+    checkingRing = true;
+    native('getRinging').then(r => {
+      checkingRing = false;
+      if (!r || !r.alarmId) return;
+      if (ring) {
+        // スヌーズ明けの再鳴動
+        if (ring.alarm.id === r.alarmId && $('#ring-overlay').hidden) showRing();
+        return;
+      }
+      const alarm = state.alarms.find(a => a.id === r.alarmId)
+        || { id: r.alarmId, label: r.label, days: [], quizType: 'math', difficulty: 'normal', count: 3, snooze: 0 };
+      startRing(alarm);
+    });
+  }
 
   function daysText(days) {
     if (!days.length) return '1回のみ';
@@ -502,6 +548,35 @@
     }).join('') : '<li class="muted">まだ記録がありません</li>';
   }
 
+  // アプリ版：確実に鳴らすための設定がオフなら案内する
+  const SETUP_ITEMS = [
+    ['notifications', '通知', 'オフだとアラームが鳴りません'],
+    ['exactAlarm', 'アラームとリマインダー', 'オフだと鳴る時刻がずれることがあります'],
+    ['fullScreen', '全画面通知', 'オフだとロック中にクイズ画面が出ません'],
+  ];
+  function renderNativeSetup() {
+    if (!isNative) return;
+    native('checkSetup').then(s => {
+      const missing = SETUP_ITEMS.filter(([k]) => s[k] === false);
+      const box = $('#native-setup');
+      box.hidden = !missing.length;
+      box.innerHTML = missing.length
+        ? '⚠️ アラームを確実に鳴らすために、次の設定をオンにしてください'
+          + missing.map(([k, name, why]) => `<div class="setup-row"><span><b>${name}</b>：${why}</span><button type="button" class="btn-text strong" data-native-settings="${k}">設定 ›</button></div>`).join('')
+        : '';
+    });
+  }
+  $('#native-setup').addEventListener('click', e => {
+    const b = e.target.closest('[data-native-settings]');
+    if (b) native('openSettings', { type: b.dataset.nativeSettings });
+  });
+  // 設定アプリから戻ってきたら再チェック
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    checkNativeRinging();
+    if ($('#screen-alarm').classList.contains('active')) renderNativeSetup();
+  });
+
   $('#alarm-list').addEventListener('click', e => {
     const item = e.target.closest('.alarm-item'); if (!item) return;
     const alarm = state.alarms.find(a => a.id === item.dataset.id);
@@ -631,7 +706,8 @@
     $('#ring-label').textContent = (ring.isTest ? '【テスト】' : '') + (ring.alarm.label || 'アラーム');
     $('#ring-clock').textContent = fmtHM(new Date());
     updateSnoozeBtn();
-    startSound();
+    // アプリ版の本番鳴動はネイティブ側が音を鳴らす（テストはブラウザの音）
+    if (!(isNative && !ring.isTest)) startSound();
     showQuestion();
   }
 
@@ -714,6 +790,11 @@
     const sec = ring.isTest ? TEST_SNOOZE_SEC : snoozeMinOf(ring.alarm) * 60;
     ring.snoozedSec += sec;
     toast(`💤 スヌーズ中（${ring.isTest ? `テストのため${sec}秒` : `${sec / 60}分`}後に再鳴動）`, 3000);
+    if (isNative && !ring.isTest) {
+      // 画面を消していてもネイティブ側が再鳴動させる
+      native('snooze', { alarmId: ring.alarm.id, label: ring.alarm.label || 'アラーム', at: Date.now() + sec * 1000 });
+      return;
+    }
     const r = ring;
     setTimeout(() => { if (ring === r) showRing(); }, sec * 1000);
   });
@@ -724,6 +805,7 @@
     const sec = Math.max(0, Math.round((Date.now() - ring.startTs) / 1000 - ring.snoozedSec));
     const wakeScore = Math.round(clamp(100 - ring.mistakes * 8 - ring.snoozes * 15 - Math.max(0, sec - ring.questions.length * 10) * 0.6, 20, 100));
     const r = ring; ring = null;
+    if (isNative && !r.isTest) native('stop');
     if (!r.alarm.days.length && !r.isTest) { r.alarm.enabled = false; save(); }
     showResult({ wakeScore, sec, snoozes: r.snoozes, isTest: r.isTest });
   }
@@ -958,11 +1040,14 @@
     renderClock();
     if (!$('#sleep-overlay').hidden) updateSleepOverlay();
     if (ring) $('#ring-clock').textContent = fmtHM(now);
+    checkNativeRinging();
 
     const minuteKey = `${dateKey(now)} ${fmtHM(now)}`;
     if (minuteKey === lastMinute) return;
     lastMinute = minuteKey;
     renderNextAlarm();
+    syncNativeAlarms(); // 鳴り終わったアラームの次回分を予約
+    if (isNative) return; // アプリ版はネイティブ側が鳴らす
     const hm = fmtHM(now), day = monDay(now);
     const hit = state.alarms.find(a => a.enabled && a.time === hm && (!a.days.length || a.days.includes(day)));
     if (hit) startRing(hit);
@@ -971,4 +1056,5 @@
   // ============ 初期表示 ============
   goto('home');
   if (state.sleeping) showSleepOverlay();
+  checkNativeRinging(); // アラームで起動された場合はすぐクイズを出す
 })();
