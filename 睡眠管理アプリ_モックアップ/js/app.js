@@ -233,6 +233,50 @@
     return '💡 ' + tips.join('<br>💡 ');
   }
 
+  // ============ リズム低下の警告 ============
+  // 今朝の記録を直近7日（今朝を除く）の平均と比べる
+  const RHYTHM_BASE_DAYS = 7;
+  const RHYTHM_MIN_LOGS = 3;      // 平均を出すのに必要な最低件数
+  const RHYTHM_THRESHOLD = 30;    // 平均からこの分数以上悪化したら警告
+
+  function rhythmAlert() {
+    const today = startOfDay(new Date());
+    const todayKey = dateKey(today);
+    const latest = state.logs.find(l => l.date === todayKey);
+    if (!latest) return null;
+    const from = dateKey(addDays(today, -RHYTHM_BASE_DAYS));
+    const base = state.logs.filter(l => l.date >= from && l.date < todayKey);
+    if (base.length < RHYTHM_MIN_LOGS) return null;
+
+    const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+    const avgDur = mean(base.map(logDuration));
+    const avgBed = mean(base.map(l => relFrom18(new Date(l.bed))));
+    const avgWake = mean(base.map(l => relFrom18(new Date(l.wake))));
+    const dur = logDuration(latest);
+    const bed = relFrom18(new Date(latest.bed));
+    const wake = relFrom18(new Date(latest.wake));
+
+    const issues = [];
+    if (avgDur - dur >= RHYTHM_THRESHOLD)
+      issues.push(`睡眠時間 <b>${durText(dur)}</b>（平均より${durText(avgDur - dur)}短い）`);
+    if (bed - avgBed >= RHYTHM_THRESHOLD)
+      issues.push(`就寝 <b>${fmtHM(new Date(latest.bed))}</b>（平均 ${minToHM(avgBed + 1080)} より${durText(bed - avgBed)}遅い）`);
+    if (wake - avgWake >= RHYTHM_THRESHOLD)
+      issues.push(`起床 <b>${fmtHM(new Date(latest.wake))}</b>（平均 ${minToHM(avgWake + 1080)} より${durText(wake - avgWake)}遅い）`);
+    return issues.length ? issues : null;
+  }
+
+  function renderRhythmWarn() {
+    const issues = rhythmAlert();
+    let html = '';
+    if (issues) {
+      const nw = wakeMinForDay((monDay(new Date()) + 1) % 7);
+      const tip = nw != null ? `今夜は <b>${minToHM(nw - sleepNeedMin())}</b> までに寝て、リズムを戻しましょう。` : '今夜は早めに寝て、リズムを戻しましょう。';
+      html = `⚠️ 睡眠リズムが平均を下回っています<br>・${issues.join('<br>・')}<br>${tip}`;
+    }
+    $$('.rhythm-warn').forEach(el => { el.hidden = !issues; el.innerHTML = html; });
+  }
+
   // ============ ホーム画面 ============
   let homeRange = 7;
   bindSeg($('#range-seg'), v => { homeRange = Number(v); renderHome(); });
@@ -286,6 +330,7 @@
     $('#sleep-chart').innerHTML = durationChart(a);
     $('#rhythm-chart').innerHTML = rhythmChart(a);
     $('#advice').innerHTML = adviceFor(a);
+    renderRhythmWarn();
     renderTodayList();
   }
 
@@ -743,6 +788,7 @@
     $('#week-label').textContent = `${dates[0].getMonth() + 1}/${dates[0].getDate()} 〜 ${dates[6].getMonth() + 1}/${dates[6].getDate()}`
       + (weekOffset === 0 ? '（今週）' : '');
 
+    renderRhythmWarn();
     let html = '<div class="tt-corner"></div>';
     dates.forEach((d, i) => {
       const cls = ['tt-head', dateKey(d) === todayKey ? 'today' : '', i === selectedDay ? 'selected' : '', i === 5 ? 'sat' : i === 6 ? 'sun' : ''].join(' ');
