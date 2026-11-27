@@ -26,6 +26,15 @@
           <button class="icon-btn" id="btn-settings" title="目標設定">⚙️</button>
         </header>
 
+        <!-- 今日の予定 -->
+        <div class="card">
+          <div class="card-title">
+            <h2>今日の予定</h2>
+            <button class="btn-text" data-goto="schedule">すべて見る ›</button>
+          </div>
+          <ul class="today-list" id="today-list"></ul>
+        </div>
+
         <!-- 次のアラーム・就寝ボタン -->
         <div class="card next-alarm">
           <div class="next-alarm-info">
@@ -78,15 +87,6 @@
           <div class="chart" id="rhythm-chart"></div>
           <div class="advice" id="advice"></div>
           <button class="btn-text" id="btn-add-log">＋ 睡眠記録を手動で追加</button>
-        </div>
-
-        <!-- 今日の予定 -->
-        <div class="card">
-          <div class="card-title">
-            <h2>今日の予定</h2>
-            <button class="btn-text" data-goto="schedule">すべて見る ›</button>
-          </div>
-          <ul class="today-list" id="today-list"></ul>
         </div>
       </section>
 
