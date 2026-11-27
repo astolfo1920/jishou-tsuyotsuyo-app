@@ -1,36 +1,99 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 偉人クイズ｜自称強つよ勢
 
-## Getting Started
+ヒントを読んで、どの偉人のことかを4択で当てるクイズアプリです。
 
-First, run the development server:
+<!-- TODO: 公開URLが最新か確認してから残す -->
+公開ページ: https://jishou-tsuyotsuyo-app.vercel.app
+
+## 遊び方
+
+1. ジャンルを選ぶ（すべて／日本史／世界史／科学／芸術）
+2. 「スタート」を押す
+3. ヒント・ジャンル・時代を見て、4つの選択肢から人物を選ぶ
+   - 1問の制限時間は20秒。時間切れは不正解になります
+   - 回答すると正解と豆知識が表示されます
+4. 1回10問（ジャンルの人数が10人未満のときはその人数）
+5. 最後に称号とふりかえりが表示されます
+
+連続正解が2問以上続くと、画面に「○連続正解！」と表示されます。
+自己ベスト（最高正解数）はブラウザに保存され、次回以降も表示されます。
+
+### 称号
+
+| 正答率 | 称号 |
+| --- | --- |
+| 全問正解 | 真の強つよ勢 |
+| 8割以上 | 強つよ勢 |
+| 5割以上 | 自称強つよ勢 |
+| 3割以上 | 見習い勢 |
+| 3割未満 | これからの人 |
+
+## 収録人物
+
+| ジャンル | 人数 |
+| --- | --- |
+| 日本史 | 14 |
+| 世界史 | 10 |
+| 科学 | 7 |
+| 芸術 | 8 |
+| 合計 | 39 |
+
+## 使用技術
+
+- [Next.js](https://nextjs.org) 16（App Router）
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- 公開: Vercel
+
+## 開発の始め方
+
+必要なもの: Node.js 20.9 以上、npm
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+ブラウザで http://localhost:3000 を開くと表示されます。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| コマンド | 内容 |
+| --- | --- |
+| `npm run dev` | 開発サーバーを起動 |
+| `npm run build` | 本番用にビルド |
+| `npm run start` | ビルドしたものを起動 |
+| `npm run lint` | ESLint でチェック |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## ファイル構成
 
-## Learn More
+```
+app/
+├── layout.tsx      ページ全体の枠・タイトル
+├── page.tsx        トップページ（Quiz を表示するだけ）
+├── quiz.tsx        クイズ本体（画面・タイマー・採点）
+└── data/
+    └── ijin.ts     偉人データ
+```
 
-To learn more about Next.js, take a look at the following resources:
+## 問題の追加・修正
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+偉人データは `app/data/ijin.ts` の `IJIN` 配列にあります。1人分は次の形です。
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```ts
+{
+  name: "聖徳太子",          // 正解・選択肢に表示される名前
+  category: "日本史",        // 日本史／世界史／科学／芸術 のどれか
+  era: "飛鳥時代",           // 問題画面に表示される時代
+  hint: "十七条の憲法や…",   // 問題文（名前を含めない）
+  fact: "法隆寺を建立した…", // 正解後に表示する豆知識
+},
+```
 
-## Deploy on Vercel
+- `hint` に名前や名前の一部を書くと答えが分かってしまうので入れないでください。
+- 誤答の選択肢は、同じジャンルの人物から選ばれます。同じジャンルに4人以上いれば、選択肢はそのジャンルだけでそろいます。
+- 新しいジャンルを増やすときは、同じファイルの `Category` 型と `CATEGORIES` にも追加してください。
+- `name` は全体で重複しないようにしてください。
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## チーム開発のルール
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+<!-- TODO: チームで決めたら記入する（例: main に直接 push せず、ブランチを切って PR でレビューしてからマージする） -->
