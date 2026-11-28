@@ -41,3 +41,12 @@ Web 側（`睡眠管理アプリ_モックアップ/`）を変更したら、毎
 2. USB でつないで `adb install -r android/app/build/outputs/apk/debug/app-debug.apk`
    （または APK ファイルをスマホに送ってタップしてインストール）
 3. 初回起動時に「通知を許可」を選ぶ。アラーム画面に設定の案内が出たら、それに従ってオンにする
+4. インストールが終わったら USB デバッグをオフに戻す（オンのままだと、許可済みの PC からアプリのデータを読み出せる）
+
+### 他の人に配るとき
+
+`app-debug.apk` はデバッグ版です。デバッグ版は PC から WebView を操作したり（`chrome://inspect`）、`adb shell run-as` でアプリのデータ（睡眠記録・予定）を読み出したりできるので、**他の人には配らないでください**。配るときはリリース版を作ります。
+
+1. Android Studio で **Build → Generate Signed App Bundle or APK → APK** を選び、署名用の鍵（keystore）を新しく作る
+2. ビルドの種類で `release` を選ぶ → `android/app/release/app-release.apk` ができる
+3. keystore ファイルとパスワードは Git に入れず、なくさないように保管する（同じ鍵で署名しないとアップデートできない）。`*.jks` / `*.keystore` は `android/.gitignore` で除外している
