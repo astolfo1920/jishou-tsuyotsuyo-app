@@ -50,6 +50,14 @@ public class MainActivity extends BridgeActivity {
         if (fromAlarm || AlarmRinger.ringing(this) != null) setShowOverLock(true);
     }
 
+    /**
+     * 鳴動が終わったとき（クイズ正解・スヌーズ）に呼ぶ。ロック画面上への表示と画面ONの維持をやめる。
+     * これをしないと、onResume が来るまでアプリ全体が PIN なしで見られる状態のまま残る。
+     */
+    public void releaseShowOverLock() {
+        runOnUiThread(() -> setShowOverLock(false));
+    }
+
     private void setShowOverLock(boolean on) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(on);

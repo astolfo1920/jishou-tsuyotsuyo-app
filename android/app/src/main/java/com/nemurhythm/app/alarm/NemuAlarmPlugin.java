@@ -18,6 +18,7 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.nemurhythm.app.MainActivity;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -40,6 +41,7 @@ public class NemuAlarmPlugin extends Plugin {
         AlarmRinger.stop(ctx);
         AlarmScheduler.snooze(ctx, call.getString("alarmId", ""), call.getString("label", ""),
             call.getLong("at", System.currentTimeMillis() + 5 * 60_000L));
+        releaseLockScreen(); // 再鳴動時は全画面通知でまたロック画面の上に出る
         call.resolve();
     }
 
@@ -48,7 +50,13 @@ public class NemuAlarmPlugin extends Plugin {
     public void stop(PluginCall call) {
         AlarmRinger.stop(getContext());
         AlarmScheduler.clearSnooze(getContext());
+        releaseLockScreen();
         call.resolve();
+    }
+
+    /** 鳴動が終わったら、ロック画面の上にアプリを出したままにしない。 */
+    private void releaseLockScreen() {
+        if (getActivity() instanceof MainActivity) ((MainActivity) getActivity()).releaseShowOverLock();
     }
 
     @PluginMethod
